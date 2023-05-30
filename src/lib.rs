@@ -18,6 +18,9 @@ struct State {
     diffuse_texture: texture::Texture,
     diffuse_bind_group: wgpu::BindGroup,
     window: Window,
+    display_texture: bool,
+    challenge_texture: texture::Texture,
+    challenge_bind_group: wgpu::BindGroup,
 }
 
 #[repr(C)]
@@ -128,6 +131,10 @@ impl State {
         let diffuse_texture =
             texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png").unwrap();
 
+        let challenge_bytes = include_bytes!("Gayge.png");
+        let challenge_texture =
+            texture::Texture::from_bytes(&device, &queue, challenge_bytes, "Gayge.png").unwrap();
+
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -164,6 +171,21 @@ impl State {
                 },
             ],
             label: Some("diffuse_bind_group"),
+        });
+
+        let challenge_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &texture_bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&challenge_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                },
+            ],
+            label: Some("challenge_bind_group"),
         });
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -226,6 +248,7 @@ impl State {
         });
 
         let num_indices = INDICES.len() as u32;
+        let display_texture = false;
 
         Self {
             window,
@@ -240,6 +263,9 @@ impl State {
             num_indices,
             diffuse_texture,
             diffuse_bind_group,
+            display_texture,
+            challenge_texture,
+            challenge_bind_group,
         }
     }
 
@@ -257,7 +283,22 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        false
+        match event {
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state,
+                        virtual_keycode: Some(VirtualKeyCode::Space),
+                        ..
+                    },
+                ..
+            } => {
+                self.display_texture = *state == ElementState::Pressed;
+
+                true
+            }
+            _ => false,
+        }
     }
 
     fn update(&mut self) {}
@@ -293,7 +334,15 @@ impl State {
             });
 
             render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+            render_pass.set_bind_group(
+                0,
+                if self.display_texture {
+                    &self.challenge_bind_group
+                } else {
+                    &self.diffuse_bind_group
+                },
+                &[],
+            );
             render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
             render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
