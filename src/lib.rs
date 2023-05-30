@@ -497,7 +497,7 @@ impl State {
         let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Instance Buffer"),
             contents: bytemuck::cast_slice(&instance_data),
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         Self {
@@ -548,6 +548,19 @@ impl State {
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
+
+        for instance in &mut self.instances {
+            instance.rotation =
+                cgmath::Quaternion::from_angle_y(cgmath::Deg(0.02)) * instance.rotation;
+        }
+
+        let raw = self
+            .instances
+            .iter()
+            .map(Instance::to_raw)
+            .collect::<Vec<_>>();
+        self.queue
+            .write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(&raw));
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
